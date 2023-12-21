@@ -23,20 +23,12 @@ typedef struct {
     int t;
 } AdamOptimizer;
 
-double ComputeY(double *input, int parameterAmount, double *parameters, double bias){
-    double result = bias;
-    
-    for(int i = 0; i < parameterAmount; i++)
-        result += parameters[i] * input[i];
-    
-    return result;
-}
-
 Model *CreateLinearRegressionModel(double **xTrain,
                                    double *yTrain,
                                    int setSize,
                                    double *parameters,
-                                   int parameterAmount, double bias){
+                                   int parameterAmount,
+                                   double bias){
     Model *model = malloc(sizeof(Model));
     model->type = LINEAR;
     model->xTrain = xTrain;
@@ -49,6 +41,37 @@ Model *CreateLinearRegressionModel(double **xTrain,
     return model;
 } 
 
+Model *CreateLogisticRegressionModel(double **xTrain,
+                                     double *yTrain,
+                                     int setSize,
+                                     double *parameters,
+                                     int parameterAmount,
+                                     double bias){
+    Model *model = malloc(sizeof(Model));
+    model->type = LOGISTIC;
+    model->xTrain = xTrain;
+    model->yTrain = yTrain;
+    model->setSize = setSize;
+    model->parameters = parameters;
+    model->parameterAmount = parameterAmount;
+    model->bias = bias;
+    
+    return model;
+} 
+
+double Sigmoid(double x){
+    return 1/(1 + exp(-x));
+}
+
+double ComputeY(Model *model, double *input){
+    double result = model->bias;
+    
+    for(int i = 0; i < model->parameterAmount; i++)
+        result += model->parameters[i] * input[i];
+    
+    return (model->type == LINEAR) ? result : Sigmoid(result);
+}
+
 double ComputeCostLinear(Model *model){
     double **input = model->xTrain;
     double *expectedOutput = model->yTrain;
@@ -58,7 +81,7 @@ double ComputeCostLinear(Model *model){
     double bias = model->bias;
     double totalCost = 0;
     for(int i = 0; i < size; i++){
-        double guess = ComputeY(input[i], parameterAmount, parameters, bias);
+        double guess = ComputeY(model, input[i]);
         totalCost += (guess - expectedOutput[i])*(guess - expectedOutput[i]);
     }
     

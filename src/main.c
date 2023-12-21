@@ -51,27 +51,30 @@ int main() {
     /////////////////////////////////////////////////////////
     srand(time(NULL));
     
+    int setSize = 100;
     double *dataX[100];
     double dataY[100];
-    int paramaterAmount = 5;
-    double parameters[50] = {0.5, 4, 1, 1, 1};
-    double bias = 30;
-    double function[50] = {2, 0.5, 0.1, 4, 3};
-    double functionBias = 50;
+    int parameterAmount = 4;
+    double parameters[50];
+    double bias;
+    double functionBias = 0.24;
+    double function[50] = {0.001, 0.002, 0.005, 0.013};
     long iterations = 0;
     long iterationsSinceDrawn = 12000000;
+    //for it to draw on first iteration
     
-    Model *model = 
-        CreateLinearRegressionModel(dataX, dataY, 100, parameters, paramaterAmount, bias);
-    Graph *graph = CreateGraph(windowWidth / 20, windowHeight / 20,
-                               windowWidth - (windowWidth / 20),
-                               windowHeight - (windowHeight / 20),
-                               10, 10,
-                               dataX, dataY, 100);
+    Model *model;
+    //model = CreateLinearRegressionModel(dataX, dataY, setSize, parameters, parameterAmount, bias);
+    model = CreateLogisticRegressionModel(dataX, dataY, setSize, parameters, parameterAmount, bias);
+    
     AdamOptimizer *adam = CreateAdamOptimizer(model->parameterAmount);
     
-    FillArrayWithPointers(dataX, model->setSize, model->parameterAmount);
-    FillArrayWithFunction(dataY, model->setSize, function, functionBias, dataX, model->parameterAmount, 10);
+    FillArrayWithPointers(dataX, model->setSize,
+                          model->parameterAmount);
+    FillArrayWithFunction(dataY, model->setSize, function,
+                          functionBias, dataX,
+                          model->parameterAmount, 
+                          model->type, 0.01);
     
     while (running) {
         while (XPending(display) > 0) {
@@ -86,14 +89,6 @@ int main() {
                 
                 windowWidth = xce.width;
                 windowHeight = xce.height;
-                
-                XClearWindow(display, window);
-                XFlush(display);
-                
-                graph->startX = windowWidth / 20;
-                graph->startY = windowHeight / 20;
-                graph->endX = windowWidth - (windowWidth / 20);
-                graph->endY = windowHeight - (windowHeight / 20);
             }
         }
         
@@ -109,7 +104,7 @@ int main() {
         }
         
         //GradientDescent(model, 0.00001);
-        AdamOptimization(ComputeCostLinear, model, adam, 0.0001, 0.9, 0.99, 0.000000001);
+        AdamOptimization(ComputeCostLinear, model, adam, 0.000001, 0.9, 0.99, 0.000000001);
         iterations++;
         iterationsSinceDrawn++;
     }

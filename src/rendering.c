@@ -80,7 +80,7 @@ void DrawCost(Display *display, Drawable window, GC gc, Model *model){
     
     for(int i = 0; i < 10; i++){
         FillArrayWithZeros(buffer, 30);
-        sprintf(buffer, "%.5lf", ComputeY(model->xTrain[i], model->parameterAmount, model->parameters, model->bias));
+        sprintf(buffer, "%.5lf", ComputeY(model, model->xTrain[i]));
         XDrawString(display, window, gc, 500, 70 + 20*i, buffer, strlen(buffer));
     }
 }
