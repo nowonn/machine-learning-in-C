@@ -10,6 +10,17 @@ typedef struct {
     int pointAmount;
 } Graph;
 
+double ComputeTrainingY(double *input, int parameterAmount, 
+                        double *parameters, double bias, 
+                        ModelType type){
+    double result = bias;
+    
+    for(int i = 0; i < parameterAmount; i++)
+        result += parameters[i] * input[i];
+    
+    return (type == LINEAR) ? result : Sigmoid(result);
+}
+
 void FillArrayWithRandomNumbers(double array[], int size, int x, int y) {
     for(int i = 0; i < size; i++) 
         array[i] = (rand() % (y - x + 1)) + x;
@@ -32,11 +43,14 @@ double EvaluatePolynomial(double *polynomial, int polynomialOrder, double x) {
 }
 
 void FillArrayWithFunction(double *array, int size, 
-                           double *function, double functionB, double **input, int inputSize, int fluctuation){
+                           double *function, double functionB, 
+                           double **input, int inputSize,
+                           ModelType type,
+                           double fluctuation){
     srand((unsigned int)time(NULL));
     for(int i = 0; i < size; i++){
         double random = (double)rand() / (double)RAND_MAX;
-        array[i] = ComputeY(input[i], inputSize, function, functionB) + random * fluctuation;
+        array[i] = ComputeTrainingY(input[i], inputSize, function, functionB, type) + random * fluctuation;
     }
 }
 
