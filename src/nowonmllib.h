@@ -13,6 +13,8 @@ typedef struct {
     double *parameters;
     int parameterAmount;
     double bias;
+    double *featuresMean;
+    double *featuresStandardDeviation;
 } Model;
 
 typedef struct {
@@ -23,38 +25,59 @@ typedef struct {
     int t;
 } AdamOptimizer;
 
-Model *CreateLinearRegressionModel(double **xTrain,
-                                   double *yTrain,
-                                   int setSize,
-                                   double *parameters,
-                                   int parameterAmount,
-                                   double bias){
-    Model *model = malloc(sizeof(Model));
-    model->type = LINEAR;
-    model->xTrain = xTrain;
-    model->yTrain = yTrain;
-    model->setSize = setSize;
-    model->parameters = parameters;
-    model->parameterAmount = parameterAmount;
-    model->bias = bias;
-    
-    return model;
-} 
+double ComputeFeatureMean(double **xTrain, Model *model, int featureIndex){
+    double sum = 0;
+    int setSize = model->setSize;
+    for(int i = 0; i < setSize; i++)
+        sum += xTrain[i][featureIndex];
+    return (sum / setSize);
+}
 
-Model *CreateLogisticRegressionModel(double **xTrain,
-                                     double *yTrain,
-                                     int setSize,
-                                     double *parameters,
-                                     int parameterAmount,
-                                     double bias){
-    Model *model = malloc(sizeof(Model));
-    model->type = LOGISTIC;
-    model->xTrain = xTrain;
-    model->yTrain = yTrain;
-    model->setSize = setSize;
-    model->parameters = parameters;
-    model->parameterAmount = parameterAmount;
-    model->bias = bias;
+double ComputeFeatureStandardDeviation(double **xTrain, Model *model, int featureIndex){
+    double deviation = 0;
+    int setSize = model->setSize;
+    for(int i = 0; i < setSize; i++)
+        deviation += pow(xTrain[i][featureIndex] - model->featuresMean[featureIndex], 2);
+    return sqrt(deviation / setSize);
+}
+
+double **ZScoreNormalize(double **dataX, Model *model){
+    int setSize = model->setSize;
+    int parameterAmount = model->parameterAmount;
+    double *means = model->featuresMean;
+    double *stdDevs = model->featuresStandardDeviation;
+    double **normalizedDataX = malloc(sizeof(double*) * setSize);
+    for(int i = 0; i < setSize; i++)
+        normalizedDataX[i] = malloc(sizeof(double) * parameterAmount);
+    
+    for(int i = 0; i < setSize; i++){
+        for(int j = 0; j < parameterAmount; j++){
+            normalizedDataX[i][j] = (dataX[i][j] - means[j]) / stdDevs[j];
+        }
+    }
+    return normalizedDataX;
+}
+
+Model CreateRegressionModel(ModelType type,
+                            double **xTrain, double *yTrain,
+                            int setSize, int parameterAmount){
+    Model model;
+    model.type = type;
+    model.setSize = setSize;
+    model.parameterAmount = parameterAmount;
+    model.parameters = malloc(sizeof(double) * parameterAmount);
+    model.bias = 0;
+    model.featuresMean = malloc(sizeof(double) * parameterAmount);
+    model.featuresStandardDeviation = malloc(sizeof(double) * parameterAmount);
+    
+    for(int i = 0; i < parameterAmount; i++){
+        model.featuresMean[i] = ComputeFeatureMean(xTrain, &model, i);
+        model.featuresStandardDeviation[i] = ComputeFeatureStandardDeviation(xTrain, &model, i);
+    }
+    
+    //model.xTrain = xTrain;
+    model.xTrain = ZScoreNormalize(xTrain, &model);
+    model.yTrain = yTrain;
     
     return model;
 } 
@@ -72,23 +95,38 @@ double ComputeY(Model *model, double *input){
     return (model->type == LINEAR) ? result : Sigmoid(result);
 }
 
-double ComputeCostLinear(Model *model){
+double MeanSquaredErrorLoss(Model *model, double guess, double expectedOutput){
+    return ((guess - expectedOutput)/2)*(guess - expectedOutput);
+}
+
+double LogisticLoss(Model *model, double guess, double expectedOutput){
+    return -expectedOutput * log(guess) - (1 - expectedOutput) * log(1 - guess);
+}
+
+double ComputeCost(Model *model){
     double **input = model->xTrain;
     double *expectedOutput = model->yTrain;
-    int size = model->setSize;
-    double *parameters = model->parameters;
-    int parameterAmount = model->parameterAmount;
-    double bias = model->bias;
+    int setSize = model->setSize;
     double totalCost = 0;
-    for(int i = 0; i < size; i++){
-        double guess = ComputeY(model, input[i]);
-        totalCost += (guess - expectedOutput[i])*(guess - expectedOutput[i]);
+    double (*LossFunction)(Model*, double, double);
+    
+    switch(model->type){
+        case LOGISTIC:
+        LossFunction = LogisticLoss;
+        break;
+        default:
+        LossFunction = MeanSquaredErrorLoss;
     }
     
-    return totalCost/(2*size);
-}//low precision because of floating point shenanigans
+    for(int i = 0; i < setSize; i++){
+        double guess = ComputeY(model, input[i]);
+        totalCost += LossFunction(model, guess, expectedOutput[i]);
+    }
+    
+    return totalCost/setSize;
+}
 
-double PartiallyDeriveCost(double (ComputeCost)(Model*), Model *model, int parameterIndex, bool isBias){
+double PartiallyDeriveCost(Model *model, int parameterIndex, bool isBias){
     double h = 0.0000000001;
     double *parameter;
     if(!isBias) parameter = &model->parameters[parameterIndex];
@@ -107,15 +145,15 @@ double PartiallyDeriveCost(double (ComputeCost)(Model*), Model *model, int param
     return (cost1 - cost2)/(2 * h);
 }
 
-void GradientDescent(double (ComputeCost)(Model*), Model *model, double learningRate){
+void GradientDescent(Model *model, double learningRate){
     double aux[model->parameterAmount];
     
     for(int i = 0; i < model->parameterAmount; i++){
-        double derivative = PartiallyDeriveCost(ComputeCost, model, i, 0);;
+        double derivative = PartiallyDeriveCost(model, i, 0);;
         aux[i] = derivative * learningRate; 
     }
     
-    double derivative = PartiallyDeriveCost(ComputeCost, model, 0, 1);
+    double derivative = PartiallyDeriveCost(model, 0, 1);
     model->bias -= derivative * learningRate;
     
     for(int i = 0; i < model->parameterAmount; i++){
@@ -133,11 +171,11 @@ AdamOptimizer *CreateAdamOptimizer(int parameterAmount){
     
     return optimizer;
 }
-void AdamOptimization(double (ComputeCost)(Model*), Model *model, AdamOptimizer *optimizer, double learningRate, double beta1, double beta2, double epsilon){
+void AdamOptimization(Model *model, AdamOptimizer *optimizer, double learningRate, double beta1, double beta2, double epsilon){
     double aux[model->parameterAmount];
     optimizer->t += 1;
     for(int i = 0; i < model->parameterAmount; i++){
-        double g = PartiallyDeriveCost(ComputeCost, model, i, 0);
+        double g = PartiallyDeriveCost(model, i, 0);
         optimizer->m[i] = beta1 * optimizer->m[i] + (1 - beta1) * g;
         optimizer->v[i] = beta2 * optimizer->v[i] + (1 - beta2) * g * g;
         double mHat = optimizer->m[i] / (1 - pow(beta1, optimizer->t));
@@ -145,14 +183,14 @@ void AdamOptimization(double (ComputeCost)(Model*), Model *model, AdamOptimizer 
         aux[i] = learningRate * mHat / (sqrt(vHat) + epsilon);
     }
     
-    double g_bias = PartiallyDeriveCost(ComputeCost, model, 0, 1);
-    optimizer->mBias = beta1 * optimizer->mBias + (1 - beta1) * g_bias;
-    optimizer->vBias = beta2 * optimizer->vBias + (1 - beta2) * g_bias * g_bias;
+    double gBias = PartiallyDeriveCost(model, 0, 1);
+    optimizer->mBias = beta1 * optimizer->mBias + (1 - beta1) * gBias;
+    optimizer->vBias = beta2 * optimizer->vBias + (1 - beta2) * gBias * gBias;
     double mHat_bias = optimizer->mBias / (1 - pow(beta1, optimizer->t));
     double vHat_bias = optimizer->vBias / (1 - pow(beta2, optimizer->t));
-    double aux_bias = learningRate * mHat_bias / (sqrt(vHat_bias) + epsilon);
+    double auxBias = learningRate * mHat_bias / (sqrt(vHat_bias) + epsilon);
     
-    model->bias -= aux_bias;
+    model->bias -= auxBias;
     
     for(int i = 0; i < model->parameterAmount; i++){
         model->parameters[i] -= aux[i]; 

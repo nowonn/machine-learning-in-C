@@ -51,30 +51,33 @@ int main() {
     /////////////////////////////////////////////////////////
     srand(time(NULL));
     
-    int setSize = 100;
-    double *dataX[100];
-    double dataY[100];
+    ModelType type = LOGISTIC;
     int parameterAmount = 4;
-    double parameters[50];
-    double bias;
-    double functionBias = 0.24;
-    double function[50] = {0.001, 0.002, 0.005, 0.013};
+    
+    int setSize = 100;
+    double *dataX[setSize];
+    double dataY[setSize];
+    double functionBias = 0.02;
+    double function[50] = {0.001, 0.0021, 0.0005, 0.012};
+    
+    bool done = false;
     long iterations = 0;
     long iterationsSinceDrawn = 12000000;
     //for it to draw on first iteration
     
-    Model *model;
-    //model = CreateLinearRegressionModel(dataX, dataY, setSize, parameters, parameterAmount, bias);
-    model = CreateLogisticRegressionModel(dataX, dataY, setSize, parameters, parameterAmount, bias);
+    FillArrayWithPointers(dataX, setSize,
+                          parameterAmount);
     
-    AdamOptimizer *adam = CreateAdamOptimizer(model->parameterAmount);
+    Model model;
+    model = CreateRegressionModel(type, dataX, dataY, setSize, parameterAmount);
     
-    FillArrayWithPointers(dataX, model->setSize,
-                          model->parameterAmount);
-    FillArrayWithFunction(dataY, model->setSize, function,
-                          functionBias, dataX,
-                          model->parameterAmount, 
-                          model->type, 0.01);
+    FillArrayWithFunction(dataY, setSize, function,
+                          functionBias, model.xTrain,
+                          parameterAmount, 
+                          type, 0.001);
+    
+    AdamOptimizer *adam = CreateAdamOptimizer(model.parameterAmount);
+    
     
     while (running) {
         while (XPending(display) > 0) {
@@ -91,22 +94,39 @@ int main() {
                 windowHeight = xce.height;
             }
         }
-        
-        if(iterationsSinceDrawn > 10000){
+        if(iterations < 2.5e5){
+            if(iterationsSinceDrawn > 1000){
+                XClearWindow(display, window);
+                
+                char buffer[25];
+                FillArrayWithZeros(buffer, 25);
+                sprintf(buffer, "iterations: %ldk", iterations/1000);
+                XDrawString(display, window, gc, 70, 50, buffer, 25);
+                
+                DrawCost(display, window, gc, &model);
+                XFlush(display);
+                
+                iterationsSinceDrawn = 0;
+            }
+            
+            //GradientDescent(&model, 0.00001);
+            AdamOptimization(&model, adam, 0.0001, 0.9, 0.99, 0.000000001);
+            
+            iterations++;
+            iterationsSinceDrawn++;
+        } else if(!done){
+            
             XClearWindow(display, window);
+            
             char buffer[25];
             FillArrayWithZeros(buffer, 25);
-            sprintf(buffer, "iterations: %ld million", iterations/1000000);
-            XDrawString(display, window, gc, 70, 50, buffer, 25);
-            DrawCost(display, window, gc, model);
+            sprintf(buffer, "iterations: %ld", iterations);
+            XDrawString(display, window, gc, 70, 50, buffer, strlen(buffer));
+            
+            DrawCost(display, window, gc, &model);
             XFlush(display);
-            iterationsSinceDrawn = 0;
+            done = true;
         }
-        
-        //GradientDescent(model, 0.00001);
-        AdamOptimization(ComputeCostLinear, model, adam, 0.000001, 0.9, 0.99, 0.000000001);
-        iterations++;
-        iterationsSinceDrawn++;
     }
     
     XCloseDisplay(display);

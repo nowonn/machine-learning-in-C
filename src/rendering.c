@@ -47,7 +47,7 @@ void DrawModelCurve(Display *display, Drawable window, GC gc,
 void DrawCost(Display *display, Drawable window, GC gc, Model *model){
     char buffer[50];
     FillArrayWithZeros(buffer, 30);
-    sprintf(buffer, "cost: %.5lf", ComputeCostLinear(model));
+    sprintf(buffer, "cost: %.5lf", ComputeCost(model));
     XDrawString(display, window, gc, 70, 70, buffer, strlen(buffer));
     
     FillArrayWithZeros(buffer, 30);
