@@ -1,15 +1,3 @@
-typedef struct {
-    int startX;
-    int startY;
-    int endX;
-    int endY;
-    int rulerXSpacing;
-    int rulerYSpacing;
-    double **pointsX;
-    double *pointsY;
-    int pointAmount;
-} Graph;
-
 double ComputeTrainingY(double *input, int parameterAmount, 
                         double *parameters, double bias, 
                         ModelType type){
