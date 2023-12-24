@@ -51,14 +51,16 @@ int main() {
     /////////////////////////////////////////////////////////
     srand(time(NULL));
     
-    ModelType type = LOGISTIC;
+    ModelType type = LINEAR;
     int parameterAmount = 4;
+    double regularizationParameter = 0;
     
+    double fluctuation = 0.0;
     int setSize = 100;
     double *dataX[setSize];
     double dataY[setSize];
-    double functionBias = 0.02;
-    double function[50] = {0.001, 0.0021, 0.0005, 0.012};
+    double functionBias = 5;
+    double function[50] = {1, 2, 5, 1};
     
     bool done = false;
     long iterations = 0;
@@ -68,15 +70,17 @@ int main() {
     FillArrayWithPointers(dataX, setSize,
                           parameterAmount);
     
-    Model model;
-    model = CreateRegressionModel(type, dataX, dataY, setSize, parameterAmount);
+    Model *model;
+    model = CreateRegressionModel(type, dataX, dataY, setSize,
+                                  parameterAmount,
+                                  regularizationParameter);
     
     FillArrayWithFunction(dataY, setSize, function,
-                          functionBias, model.xTrain,
+                          functionBias, model->xTrain,
                           parameterAmount, 
-                          type, 0.001);
+                          type, fluctuation);
     
-    AdamOptimizer *adam = CreateAdamOptimizer(model.parameterAmount);
+    AdamOptimizer *adam = CreateAdamOptimizer(model->parameterAmount);
     
     
     while (running) {
@@ -103,14 +107,14 @@ int main() {
                 sprintf(buffer, "iterations: %ldk", iterations/1000);
                 XDrawString(display, window, gc, 70, 50, buffer, 25);
                 
-                DrawCost(display, window, gc, &model);
+                DrawCost(display, window, gc, model);
                 XFlush(display);
                 
                 iterationsSinceDrawn = 0;
             }
             
-            //GradientDescent(&model, 0.00001);
-            AdamOptimization(&model, adam, 0.0001, 0.9, 0.99, 0.000000001);
+            //GradientDescent(model, 0.00001);
+            AdamOptimization(model, adam, 0.0001, 0.9, 0.99, 0.000000001);
             
             iterations++;
             iterationsSinceDrawn++;
@@ -123,7 +127,7 @@ int main() {
             sprintf(buffer, "iterations: %ld", iterations);
             XDrawString(display, window, gc, 70, 50, buffer, strlen(buffer));
             
-            DrawCost(display, window, gc, &model);
+            DrawCost(display, window, gc, model);
             XFlush(display);
             done = true;
         }

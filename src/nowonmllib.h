@@ -15,6 +15,7 @@ typedef struct {
     double bias;
     double *featuresMean;
     double *featuresStandardDeviation;
+    double regularizationParameter;
 } Model;
 
 typedef struct {
@@ -58,26 +59,28 @@ double **ZScoreNormalize(double **dataX, Model *model){
     return normalizedDataX;
 }
 
-Model CreateRegressionModel(ModelType type,
-                            double **xTrain, double *yTrain,
-                            int setSize, int parameterAmount){
-    Model model;
-    model.type = type;
-    model.setSize = setSize;
-    model.parameterAmount = parameterAmount;
-    model.parameters = malloc(sizeof(double) * parameterAmount);
-    model.bias = 0;
-    model.featuresMean = malloc(sizeof(double) * parameterAmount);
-    model.featuresStandardDeviation = malloc(sizeof(double) * parameterAmount);
+Model *CreateRegressionModel(ModelType type,
+                             double **xTrain, double *yTrain,
+                             int setSize, int parameterAmount,
+                             double regularizationParameter){
+    Model *model = malloc(sizeof(Model));
+    model->type = type;
+    model->setSize = setSize;
+    model->parameterAmount = parameterAmount;
+    model->parameters = malloc(sizeof(double) * parameterAmount);
+    model->bias = 0;
+    model->featuresMean = malloc(sizeof(double) * parameterAmount);
+    model->featuresStandardDeviation = malloc(sizeof(double) * parameterAmount);
+    model->regularizationParameter = regularizationParameter;
     
     for(int i = 0; i < parameterAmount; i++){
-        model.featuresMean[i] = ComputeFeatureMean(xTrain, &model, i);
-        model.featuresStandardDeviation[i] = ComputeFeatureStandardDeviation(xTrain, &model, i);
+        model->featuresMean[i] = ComputeFeatureMean(xTrain, model, i);
+        model->featuresStandardDeviation[i] = ComputeFeatureStandardDeviation(xTrain, model, i);
     }
     
-    //model.xTrain = xTrain;
-    model.xTrain = ZScoreNormalize(xTrain, &model);
-    model.yTrain = yTrain;
+    //model->xTrain = xTrain;
+    model->xTrain = ZScoreNormalize(xTrain, model);
+    model->yTrain = yTrain;
     
     return model;
 } 
@@ -103,6 +106,15 @@ double LogisticLoss(Model *model, double guess, double expectedOutput){
     return -expectedOutput * log(guess) - (1 - expectedOutput) * log(1 - guess);
 }
 
+double ComputeRegularizationTerm(Model *model){
+    double totalRegularizationTerm = 0;
+    for(int i = 0; i < model->setSize; i++){
+        totalRegularizationTerm += model->parameters[i] * model->parameters[i];
+    }
+    totalRegularizationTerm += model->bias * model->bias;
+    return totalRegularizationTerm * model->regularizationParameter / (model->setSize << 1);
+}
+
 double ComputeCost(Model *model){
     double **input = model->xTrain;
     double *expectedOutput = model->yTrain;
@@ -123,7 +135,11 @@ double ComputeCost(Model *model){
         totalCost += LossFunction(model, guess, expectedOutput[i]);
     }
     
-    return totalCost/setSize;
+    double cost = totalCost/setSize;
+    
+    if(model->regularizationParameter > 1e-8) cost += ComputeRegularizationTerm(model);
+    
+    return cost;
 }
 
 double PartiallyDeriveCost(Model *model, int parameterIndex, bool isBias){
