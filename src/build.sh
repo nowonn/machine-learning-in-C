@@ -1,1 +1,1 @@
-gcc -o test main.c -lX11 -lm -O3
+gcc -o test main.c nowonmllib.c -lX11 -lm -O3

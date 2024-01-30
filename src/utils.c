@@ -1,3 +1,22 @@
+void FillDataArraysFromFile(FILE *file, double ***dataX, double **dataY, int *parameterAmount, int *setSize){
+    fscanf(file, "%d%d", setSize, parameterAmount);
+    
+    *dataY = malloc(sizeof(double) * *setSize);
+    *dataX = malloc(sizeof(double*) * *setSize);
+    for(int i = 0; i < *setSize; i++){
+        (*dataX)[i] = malloc(sizeof(double) * *parameterAmount);
+    }
+    
+    for(int i = 0; i < *setSize; i++){
+        for(int j = 0; j < *parameterAmount; j++)
+            fscanf(file, "%lf,", &((*dataX)[i][j]));
+        
+        fscanf(file, "%lf", &((*dataY)[i]));
+    }
+    
+    fclose(file);
+}
+
 double ComputeTrainingY(double *input, int parameterAmount, 
                         double *parameters, double bias, 
                         ModelType type){
@@ -6,7 +25,7 @@ double ComputeTrainingY(double *input, int parameterAmount,
     for(int i = 0; i < parameterAmount; i++)
         result += parameters[i] * input[i];
     
-    return (type == LINEAR) ? result : Sigmoid(result);
+    return (type == POLYNOMIAL) ? result : Sigmoid(result);
 }
 
 void FillArrayWithRandomNumbers(double array[], int size, int x, int y) {
