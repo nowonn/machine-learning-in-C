@@ -9,12 +9,12 @@ void DrawCost(Display *display, Drawable window, GC gc, Model *model){
     XDrawString(display, window, gc, 70, 90, buffer, strlen(buffer));
     
     FillArrayWithZeros(buffer, 30);
-    sprintf(buffer, "first 10 yTrains:", model->bias);
-    XDrawString(display, window, gc, 380, 50, buffer, 17);
+    sprintf(buffer, "first yTrains:", model->bias);
+    XDrawString(display, window, gc, 380, 50, buffer, 14);
     
     FillArrayWithZeros(buffer, 30);
-    sprintf(buffer, "first 10 guesses:", model->bias);
-    XDrawString(display, window, gc, 500, 50, buffer, 17);
+    sprintf(buffer, "first guesses:", model->bias);
+    XDrawString(display, window, gc, 500, 50, buffer, 14);
     
     FillArrayWithZeros(buffer, 30);
     sprintf(buffer, "guessed parameters:", model->bias);
@@ -25,7 +25,13 @@ void DrawCost(Display *display, Drawable window, GC gc, Model *model){
         sprintf(buffer, "%.5lf", model->parameters[i]);
         XDrawString(display, window, gc, 70, 130 + 20*i, buffer, strlen(buffer));
     }
-    
+    /*
+    for(int i = 0; i < model->parameterAmount; i++){
+        FillArrayWithZeros(buffer, 30);
+        sprintf(buffer, "%.5lf", model->xTrain[99][i]);
+        XDrawString(display, window, gc, 130, 130 + 20*i, buffer, strlen(buffer));
+    }
+    */
     for(int i = 0; i < 10; i++){
         FillArrayWithZeros(buffer, 30);
         sprintf(buffer, "%.5lf", model->yTrain[i]);

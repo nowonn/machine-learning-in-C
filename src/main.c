@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <time.h>
-#include <math.h>
 #include <string.h>
 #include <unistd.h>
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 
+bool paused = false;
 bool running = true;
 int windowWidth = 800;
 int windowHeight = 600;
@@ -39,6 +39,7 @@ int main() {
                            depth, InputOutput, visual, valuemask, &attributes);
     XSelectInput(display, window, ExposureMask | KeyPressMask | StructureNotifyMask);
     XMapWindow(display, window);
+    XSync(display, False);
     
     gc = XCreateGC(display, window, valuemask, &values);
     if (gc < 0) {
@@ -48,48 +49,71 @@ int main() {
     XSetLineAttributes(display, gc, 1, LineSolid, CapButt, JoinMiter);
     XSetForeground(display, gc, WhitePixel(display, screen));
     XSetWindowBackground(display, window, BlackPixel(display, screen));
+    
+    XClearWindow(display, window);
+    
+    char buffer[25];
+    FillArrayWithZeros(buffer, 25);
+    sprintf(buffer, "training...");
+    XDrawString(display, window, gc, 70, 50, buffer, strlen(buffer));
+    
+    XFlush(display);
+    
     /////////////////////////////////////////////////////////
     srand(time(NULL));
     
-    ModelType type = LINEAR;
-    int parameterAmount = 4;
+    ModelType type = POLYNOMIAL;
     double regularizationParameter = 0;
+    long iterations = 500000;
+    double learningRate = 0.0001;
+    int polynomialOrder = 1;
     
-    double fluctuation = 0.0;
-    int setSize = 100;
-    double *dataX[setSize];
-    double dataY[setSize];
-    double functionBias = 5;
-    double function[50] = {1, 2, 5, 1};
+    int parameterAmount;
+    int setSize;
+    double **dataX;
+    double *dataY;
+    FILE *inputFile = fopen("../data/input.csv", "r");
     
-    bool done = false;
-    long iterations = 0;
-    long iterationsSinceDrawn = 12000000;
-    //for it to draw on first iteration
-    
-    FillArrayWithPointers(dataX, setSize,
-                          parameterAmount);
+    FillDataArraysFromFile(inputFile, &dataX, &dataY, &parameterAmount, &setSize);
     
     Model *model;
-    model = CreateRegressionModel(type, dataX, dataY, setSize,
-                                  parameterAmount,
+    model = CreateRegressionModel(type,
                                   regularizationParameter);
     
-    FillArrayWithFunction(dataY, setSize, function,
-                          functionBias, model->xTrain,
-                          parameterAmount, 
-                          type, fluctuation);
+    Train(model, dataX, dataY, setSize, parameterAmount, iterations, learningRate, polynomialOrder);
     
-    AdamOptimizer *adam = CreateAdamOptimizer(model->parameterAmount);
+    XEvent e;
+    do {
+        XNextEvent(display, &e);
+    } while (e.type != Expose);
     
+    XClearWindow(display, window);
+    
+    FillArrayWithZeros(buffer, 25);
+    sprintf(buffer, "iterations: %ld", iterations);
+    XDrawString(display, window, gc, 70, 50, buffer, strlen(buffer));
+    
+    DrawCost(display, window, gc, model);
+    XFlush(display);
     
     while (running) {
         while (XPending(display) > 0) {
             XNextEvent(display, &event);
             if(event.type == KeyPress) {
                 KeySym key = XLookupKeysym(&event.xkey, 0);
-                if(key == XK_Escape) {
-                    running = false;
+                if(key == XK_Escape) running = false;
+                if(key == XK_space){
+                    Train(model, dataX, dataY, setSize, parameterAmount, iterations, learningRate, polynomialOrder);
+                    
+                    XClearWindow(display, window);
+                    
+                    FillArrayWithZeros(buffer, 25);
+                    sprintf(buffer, "iterations: %ld", iterations);
+                    XDrawString(display, window, gc, 70, 50, buffer, strlen(buffer));
+                    
+                    DrawCost(display, window, gc, model);
+                    XFlush(display);
+                    
                 }
             } else if(event.type == ConfigureNotify) {
                 XConfigureEvent xce = event.xconfigure;
@@ -98,39 +122,7 @@ int main() {
                 windowHeight = xce.height;
             }
         }
-        if(iterations < 2.5e5){
-            if(iterationsSinceDrawn > 1000){
-                XClearWindow(display, window);
-                
-                char buffer[25];
-                FillArrayWithZeros(buffer, 25);
-                sprintf(buffer, "iterations: %ldk", iterations/1000);
-                XDrawString(display, window, gc, 70, 50, buffer, 25);
-                
-                DrawCost(display, window, gc, model);
-                XFlush(display);
-                
-                iterationsSinceDrawn = 0;
-            }
-            
-            //GradientDescent(model, 0.00001);
-            AdamOptimization(model, adam, 0.0001, 0.9, 0.99, 0.000000001);
-            
-            iterations++;
-            iterationsSinceDrawn++;
-        } else if(!done){
-            
-            XClearWindow(display, window);
-            
-            char buffer[25];
-            FillArrayWithZeros(buffer, 25);
-            sprintf(buffer, "iterations: %ld", iterations);
-            XDrawString(display, window, gc, 70, 50, buffer, strlen(buffer));
-            
-            DrawCost(display, window, gc, model);
-            XFlush(display);
-            done = true;
-        }
+        
     }
     
     XCloseDisplay(display);
